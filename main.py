@@ -23,7 +23,6 @@ KV = '''
         padding: ["20dp", "25dp", "20dp", "25dp"]
         spacing: "16dp"
 
-        # العنوان الرئيسي
         MDLabel:
             text: "تفعيل التطبيق"
             font_name: "font.ttf"
@@ -35,7 +34,6 @@ KV = '''
             size_hint_y: None
             height: "45dp"
 
-        # بطاقة كود الجهاز
         MDCard:
             orientation: "vertical"
             padding: "16dp"
@@ -76,7 +74,6 @@ KV = '''
                     md_bg_color: 0.2, 0.6, 0.86, 1
                     on_release: root.copy_device_code()
 
-        # خانة إدخال مفتاح التفعيل
         MDTextField:
             id: key_input
             hint_text: "أدخل كود التفعيل هنا"
@@ -101,7 +98,6 @@ KV = '''
             size_hint_y: None
             height: "5dp"
 
-        # بطاقة شراء الاشتراك عبر واتساب
         MDCard:
             orientation: "vertical"
             padding: "16dp"
@@ -144,11 +140,9 @@ KV = '''
 '''
 
 class ActivationScreen(Screen):
-    # رقم الواتساب المباشر
     WHATSAPP_NUMBER = "201155661920"
 
     def __init__(self, **kwargs):
-        # استخراج معرّف فريد للجهاز
         self.device_id = str(uuid.getnode())[:10]
         self.selected_duration = "شهر واحد"
         super().__init__(**kwargs)
@@ -202,7 +196,6 @@ class ActivationScreen(Screen):
             Snackbar(text="يرجى إدخال كود التفعيل أولاً").open()
             return
 
-        # مكان دمج منطق التحقق من المفتاح الخاص بك
         Snackbar(text="تم تفعيل التطبيق بنجاح!").open()
 
 
