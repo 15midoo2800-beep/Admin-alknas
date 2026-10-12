@@ -1,212 +1,216 @@
-import hashlib
-import hmac
 import urllib.parse
-from datetime import datetime, timedelta
-
-from kivy.app import App
+import uuid
+import webbrowser
+from kivy.lang import Builder
 from kivy.core.clipboard import Clipboard
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.label import Label
-from kivy.uix.textinput import TextInput
-from kivy.uix.button import Button
-from kivy.utils import platform
+from kivy.uix.screenmanager import Screen
+from kivymd.app import MDApp
+from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.snackbar import Snackbar
 
-import os
-FONT_PATH = "font.ttf" if os.path.exists("font.ttf") else "Roboto"
+KV = '''
+<ActivationScreen>:
+    name: "activation"
+    canvas.before:
+        Color:
+            rgba: 0.08, 0.1, 0.14, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
 
-def ar(text):
-    if not text:
-        return ""
-    try:
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(str(text)))
-    except Exception:
-        return str(text)
+    BoxLayout:
+        orientation: "vertical"
+        padding: ["20dp", "25dp", "20dp", "25dp"]
+        spacing: "16dp"
 
-# المفتاح السري نفسه المدمج في تطبيق "القناص"
-MASTER_SECRET = b"ALKNAS_TACTICAL_MILITARY_KEY_2026_SECURE"
+        # العنوان الرئيسي
+        MDLabel:
+            text: "تفعيل التطبيق"
+            font_name: "font.ttf"
+            font_size: "26sp"
+            bold: True
+            halign: "center"
+            theme_text_color: "Custom"
+            text_color: 1, 1, 1, 1
+            size_hint_y: None
+            height: "45dp"
 
-class AlknasKeygenApp(App):
+        # بطاقة كود الجهاز
+        MDCard:
+            orientation: "vertical"
+            padding: "16dp"
+            spacing: "12dp"
+            radius: [16, 16, 16, 16]
+            elevation: 4
+            md_bg_color: 0.14, 0.17, 0.24, 1
+            size_hint_y: None
+            height: "135dp"
+
+            MDLabel:
+                text: "كود الجهاز الخاص بك:"
+                font_name: "font.ttf"
+                font_size: "16sp"
+                theme_text_color: "Custom"
+                text_color: 0.75, 0.75, 0.75, 1
+                size_hint_y: None
+                height: "25dp"
+
+            BoxLayout:
+                orientation: "horizontal"
+                spacing: "12dp"
+
+                MDLabel:
+                    id: device_id_label
+                    text: root.device_id
+                    font_size: "20sp"
+                    bold: True
+                    theme_text_color: "Custom"
+                    text_color: 0.2, 0.85, 0.55, 1
+                    valign: "middle"
+
+                MDRaisedButton:
+                    text: "نسخ الكود"
+                    font_name: "font.ttf"
+                    font_size: "16sp"
+                    bold: True
+                    md_bg_color: 0.2, 0.6, 0.86, 1
+                    on_release: root.copy_device_code()
+
+        # خانة إدخال مفتاح التفعيل
+        MDTextField:
+            id: key_input
+            hint_text: "أدخل كود التفعيل هنا"
+            font_name_hint_text: "font.ttf"
+            font_size: "18sp"
+            mode: "rectangle"
+            line_color_focus: 0.2, 0.85, 0.55, 1
+            hint_text_color_normal: 0.65, 0.65, 0.65, 1
+            text_color_normal: 1, 1, 1, 1
+
+        MDRaisedButton:
+            text: "تأكيد التفعيل"
+            font_name: "font.ttf"
+            font_size: "18sp"
+            bold: True
+            size_hint_x: 1
+            height: "50dp"
+            md_bg_color: 0.18, 0.8, 0.44, 1
+            on_release: root.verify_license()
+
+        Widget:
+            size_hint_y: None
+            height: "5dp"
+
+        # بطاقة شراء الاشتراك عبر واتساب
+        MDCard:
+            orientation: "vertical"
+            padding: "16dp"
+            spacing: "12dp"
+            radius: [16, 16, 16, 16]
+            elevation: 3
+            md_bg_color: 0.12, 0.15, 0.21, 1
+            size_hint_y: None
+            height: "170dp"
+
+            MDLabel:
+                text: "طلب شراء كود التفعيل:"
+                font_name: "font.ttf"
+                font_size: "18sp"
+                bold: True
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                size_hint_y: None
+                height: "28dp"
+
+            MDRaisedButton:
+                id: duration_btn
+                text: "مدة الاشتراك: شهر واحد ▼"
+                font_name: "font.ttf"
+                font_size: "16sp"
+                size_hint_x: 1
+                height: "44dp"
+                md_bg_color: 0.22, 0.28, 0.38, 1
+                on_release: root.open_duration_menu()
+
+            MDRaisedButton:
+                text: "إرسال الكود عبر واتساب 💬"
+                font_name: "font.ttf"
+                font_size: "17sp"
+                bold: True
+                size_hint_x: 1
+                height: "48dp"
+                md_bg_color: 0.15, 0.68, 0.37, 1
+                on_release: root.send_to_whatsapp()
+'''
+
+class ActivationScreen(Screen):
+    # رقم الواتساب المباشر
+    WHATSAPP_NUMBER = "201155661920"
+
+    def __init__(self, **kwargs):
+        # استخراج معرّف فريد للجهاز
+        self.device_id = str(uuid.getnode())[:10]
+        self.selected_duration = "شهر واحد"
+        super().__init__(**kwargs)
+        self.menu = None
+
+    def on_kv_post(self, base_widget):
+        durations = ["شهر واحد", "3 أشهر", "6 أشهر", "سنة كاملة"]
+        menu_items = [
+            {
+                "viewclass": "OneLineListItem",
+                "text": dur,
+                "on_release": lambda x=dur: self.set_duration(x),
+            } for dur in durations
+        ]
+        self.menu = MDDropdownMenu(
+            caller=self.ids.duration_btn,
+            items=menu_items,
+            width_mult=4,
+        )
+
+    def open_duration_menu(self):
+        if self.menu:
+            self.menu.open()
+
+    def set_duration(self, text_item):
+        self.selected_duration = text_item
+        self.ids.duration_btn.text = f"مدة الاشتراك: {text_item} ▼"
+        self.menu.dismiss()
+
+    def copy_device_code(self):
+        Clipboard.copy(self.device_id)
+        Snackbar(
+            text="تم نسخ كود الجهاز بنجاح!",
+            font_size="16sp",
+            duration=2
+        ).open()
+
+    def send_to_whatsapp(self):
+        message = (
+            f"مرحباً، أود شراء تفعيل لتطبيق القناص.\n"
+            f"📱 كود جهازي: {self.device_id}\n"
+            f"⏳ مدة الاشتراك المطلوبة: {self.selected_duration}"
+        )
+        encoded_message = urllib.parse.quote(message)
+        whatsapp_url = f"https://wa.me/{self.WHATSAPP_NUMBER}?text={encoded_message}"
+        webbrowser.open(whatsapp_url)
+
+    def verify_license(self):
+        entered_key = self.ids.key_input.text.strip()
+        if not entered_key:
+            Snackbar(text="يرجى إدخال كود التفعيل أولاً").open()
+            return
+
+        # مكان دمج منطق التحقق من المفتاح الخاص بك
+        Snackbar(text="تم تفعيل التطبيق بنجاح!").open()
+
+
+class MainApp(MDApp):
     def build(self):
-        self.selected_days = 30
-        self.generated_key = ""
+        self.theme_cls.theme_style = "Dark"
+        Builder.load_string(KV)
+        return ActivationScreen()
 
-        root = BoxLayout(orientation='vertical', padding=14, spacing=10)
-
-        # 1. العنوان
-        header = Label(
-            text=ar("لوحة إدارة تراخيص القناص 🛡️"),
-            font_name=FONT_PATH,
-            font_size='18sp',
-            bold=True,
-            color=(0.2, 0.9, 0.5, 1),
-            size_hint=(1, 0.1)
-        )
-        root.add_widget(header)
-
-        # 2. إدخال كود جهاز العميل
-        root.add_widget(Label(text=ar("كود جهاز العميل (Device ID):"), font_name=FONT_PATH, font_size='13sp', size_hint=(1, 0.06)))
-        
-        dev_row = BoxLayout(orientation='horizontal', spacing=8, size_hint=(1, 0.11))
-        self.inp_dev_id = TextInput(
-            hint_text=ar("ألصق كود الجهاز هنا..."),
-            font_name=FONT_PATH,
-            multiline=False,
-            font_size='16sp',
-            halign='center',
-            background_color=(0.95, 0.95, 0.98, 1),
-            foreground_color=(0.1, 0.1, 0.1, 1),
-            size_hint=(0.75, 1)
-        )
-        dev_row.add_widget(self.inp_dev_id)
-
-        btn_paste = Button(
-            text=ar("لصق"),
-            font_name=FONT_PATH,
-            font_size='14sp',
-            background_color=(0.2, 0.4, 0.6, 1),
-            size_hint=(0.25, 1)
-        )
-        btn_paste.bind(on_press=self.paste_from_clipboard)
-        dev_row.add_widget(btn_paste)
-        root.add_widget(dev_row)
-
-        # 3. اختيار مدة الترخيص
-        root.add_widget(Label(text=ar("اختر مدة صلاحية الترخيص:"), font_name=FONT_PATH, font_size='13sp', size_hint=(1, 0.06)))
-        
-        dur_grid = GridLayout(cols=4, spacing=6, size_hint=(1, 0.11))
-        self.btn_30 = Button(text=ar("30 يوم"), font_name=FONT_PATH, background_color=(0.1, 0.6, 0.3, 1))
-        self.btn_90 = Button(text=ar("3 أشهر"), font_name=FONT_PATH, background_color=(0.2, 0.25, 0.35, 1))
-        self.btn_180 = Button(text=ar("6 أشهر"), font_name=FONT_PATH, background_color=(0.2, 0.25, 0.35, 1))
-        self.btn_365 = Button(text=ar("سنة"), font_name=FONT_PATH, background_color=(0.2, 0.25, 0.35, 1))
-
-        self.btn_30.bind(on_press=lambda x: self.set_duration(30, self.btn_30))
-        self.btn_90.bind(on_press=lambda x: self.set_duration(90, self.btn_90))
-        self.btn_180.bind(on_press=lambda x: self.set_duration(180, self.btn_180))
-        self.btn_365.bind(on_press=lambda x: self.set_duration(365, self.btn_365))
-
-        dur_grid.add_widget(self.btn_30)
-        dur_grid.add_widget(self.btn_90)
-        dur_grid.add_widget(self.btn_180)
-        dur_grid.add_widget(self.btn_365)
-        root.add_widget(dur_grid)
-
-        # 4. زر التوليد
-        btn_gen = Button(
-            text=ar("⚡ توليد كود التفعيل ⚡"),
-            font_name=FONT_PATH,
-            font_size='16sp',
-            bold=True,
-            background_color=(0.15, 0.5, 0.9, 1),
-            size_hint=(1, 0.12)
-        )
-        btn_gen.bind(on_press=self.generate_key)
-        root.add_widget(btn_gen)
-
-        # 5. عرض النتيجة
-        self.lbl_result = TextInput(
-            text="",
-            font_name=FONT_PATH,
-            readonly=True,
-            multiline=True,
-            font_size='15sp',
-            halign='center',
-            background_color=(0.08, 0.1, 0.14, 1),
-            foreground_color=(0.2, 1.0, 0.5, 1),
-            size_hint=(1, 0.26)
-        )
-        root.add_widget(self.lbl_result)
-
-        # 6. أزرار الإجراء السريع (نسخ وإرسال واتساب)
-        actions = BoxLayout(orientation='horizontal', spacing=8, size_hint=(1, 0.12))
-        
-        btn_copy = Button(
-            text=ar("📋 نسخ المفتاح"),
-            font_name=FONT_PATH,
-            font_size='14sp',
-            background_color=(0.3, 0.35, 0.45, 1)
-        )
-        btn_copy.bind(on_press=self.copy_key)
-        actions.add_widget(btn_copy)
-
-        btn_send_wa = Button(
-            text=ar("📲 إرسال للعميل بالواتساب"),
-            font_name=FONT_PATH,
-            font_size='14sp',
-            bold=True,
-            background_color=(0.1, 0.65, 0.35, 1)
-        )
-        btn_send_wa.bind(on_press=self.send_via_whatsapp)
-        actions.add_widget(btn_send_wa)
-        root.add_widget(actions)
-
-        return root
-
-    def set_duration(self, days, active_btn):
-        self.selected_days = days
-        for btn in [self.btn_30, self.btn_90, self.btn_180, self.btn_365]:
-            btn.background_color = (0.2, 0.25, 0.35, 1)
-        active_btn.background_color = (0.1, 0.6, 0.3, 1)
-
-    def paste_from_clipboard(self, instance):
-        clip_txt = Clipboard.paste()
-        if clip_txt:
-            self.inp_dev_id.text = clip_txt.strip()
-
-    def generate_key(self, instance):
-        dev_id = self.inp_dev_id.text.strip()
-        if not dev_id:
-            self.lbl_result.text = ar("يرجى إدخال أو لصق كود الجهاز أولاً!")
-            return
-
-        expiry_date = (datetime.now() + timedelta(days=self.selected_days)).strftime("%Y%m%d")
-        payload = f"{dev_id}:{expiry_date}".encode('utf-8')
-        sig = hmac.new(MASTER_SECRET, payload, hashlib.sha256).hexdigest()[:12].upper()
-        self.generated_key = f"ALK-{expiry_date}-{sig}"
-
-        display_text = (
-            f"تم توليد الترخيص بنجاح:\n"
-            f"الجهاز: {dev_id}\n"
-            f"الصلاحية: {self.selected_days} يوم (حتى {expiry_date})\n\n"
-            f"المفتاح: {self.generated_key}"
-        )
-        self.lbl_result.text = ar(display_text)
-
-    def copy_key(self, instance):
-        if self.generated_key:
-            Clipboard.copy(self.generated_key)
-            self.lbl_result.text = ar(f"تم نسخ المفتاح إلى الحافظة بنجاح!\n\n{self.generated_key}")
-
-    def send_via_whatsapp(self, instance):
-        if not self.generated_key:
-            return
-
-        msg = (
-            f"مرحباً بك، ترخيص تطبيق *القناص PRO* الخاص بك جاهز:\n\n"
-            f"🔑 *مفتاح التفعيل:*\n`{self.generated_key}`\n\n"
-            f"📅 الصلاحية: {self.selected_days} يوم.\n"
-            f"قم بفتح التطبيق ولصق الكود لتفعيله مباشرة."
-        )
-        encoded = urllib.parse.quote(msg)
-        wa_url = f"https://api.whatsapp.com/send?text={encoded}"
-
-        if platform == 'android':
-            try:
-                from jnius import autoclass
-                PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                Intent = autoclass('android.content.Intent')
-                Uri = autoclass('android.net.Uri')
-                intent = Intent(Intent.ACTION_VIEW)
-                intent.setData(Uri.parse(wa_url))
-                PythonActivity.mActivity.startActivity(intent)
-                return
-            except Exception:
-                pass
-
-        import webbrowser
-        webbrowser.open(wa_url)
-
-if __name__ == '__main__':
-    AlknasKeygenApp().run()
+if __name__ == "__main__":
+    MainApp().run()
