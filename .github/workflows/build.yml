@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -16,23 +16,26 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install system dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git zip unzip autoconf libtool pkg-config zlib1g-dev \
             libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev \
             libltdl-dev libjpeg-dev libpng-dev libfreetype6-dev
 
-      - name: Install Buildozer & Dependencies
+      - name: Install Buildozer, Cython, and Stable p4a
         run: |
           python -m pip install --upgrade pip
-          pip install "Cython<3.0" "buildozer>=1.5.0" virtualenv
+          pip install "Cython==0.29.36" virtualenv
+          pip install buildozer
+          # تثبيت إصدار مستقر من python-for-android يمنع استخدام Python 3.14 التجريبي
+          pip install git+https://github.com/kivy/python-for-android.git@v2024.01.21
 
       - name: Build APK with Buildozer
         run: |
