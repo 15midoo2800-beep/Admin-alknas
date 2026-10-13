@@ -6,8 +6,8 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf
 version = 0.1
 
-# تثبيت إصدار بايثون 3.11 المعتمد لأندرويد بدلاً من 3.14
-requirements = python3==3.11.5,kivy==2.3.0,kivymd==1.2.0
+# نكتب python3 بدون أرقام إصدارات لتقرأها وصفة p4a المستقرة
+requirements = python3,kivy==2.3.0,kivymd==1.2.0
 
 orientation = portrait
 fullscreen = 0
